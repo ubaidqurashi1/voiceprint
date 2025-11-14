@@ -23,27 +23,31 @@
 
 
 Technical Architecture
-┌─────────────────────────────────────────────────────────────┐
-│  INPUT: Raw waveform (48 kHz, mono)                         │
-└──────────────────────┬──────────────────────────────────────┘
-                       │
-┌──────────────────────▼──────────────────────────────────────┐
-│  1. COCHLEA: Half-wave rectifier + STFT → Rate-code map    │
-│     (Mimics basilar membrane & inner hair cells)           │
-└──────────────────────┬──────────────────────────────────────┘
-                       │
-┌──────────────────────▼──────────────────────────────────────┐
-│  2. BRAINSTEM: Autocorrelation → F0 + jitter              │
-│     (Mimics inferior colliculus pitch extraction)          │
-└──────────────────────┬──────────────────────────────────────┘
-                       │
-┌──────────────────────▼──────────────────────────────────────┐
-│  3. CORTEX: 5 features → Logistic Regression               │
-│     (Mimizes auditory cortex → posterior mapping)          │
-└──────────────────────┬──────────────────────────────────────┘
-                       │
-┌──────────────────────▼──────────────────────────────────────┐
-│  OUTPUT: P(gender), P(emotion), P(location)               │
-└─────────────────────────────────────────────────────────────┘
+
+INPUT: Raw waveform (48 kHz, mono)                         
+
+                       
 
 
+
+ 1. COCHLEA: Half-wave rectifier + STFT → Rate-code map
+
+  (Mimics basilar membrane & inner hair cells)           
+                       
+
+
+
+
+2. BRAINSTEM: Autocorrelation → F0 + jitter     
+
+(Mimics inferior colliculus pitch extraction)          
+
+
+
+3. CORTEX: 5 features → Logistic Regression
+
+(Mimizes auditory cortex → posterior mapping)          
+
+
+
+OUTPUT: P(gender), P(emotion), P(location)               
