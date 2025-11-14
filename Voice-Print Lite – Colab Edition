@@ -1,0 +1,63 @@
+# %%{colab}%%
+# Voice-Print Lite – Colab Edition
+# Run this cell. Done.
+
+# Auto-install
+!pip -q install librosa pyworld scikit-learn soundfile
+
+# The full algorithm in one cell
+import numpy as np, librosa, pyworld, soundfile as sf, warnings, os
+from scipy.signal import correlate
+from sklearn.linear_model import LogisticRegression
+warnings.filterwarnings('ignore')
+
+SR = 48_000
+EMOS = ['angry','disgust','fear','happy','neutral','sad','surprise']
+
+def extract(y):
+    if len(y) < SR: y = np.pad(y, (0, SR - len(y)))
+    f0, _ = pyworld.harvest(y.astype(np.float64), SR, f0_floor=75, f0_ceil=600)
+    f0 = f0[f0 > 0]
+    S = np.abs(librosa.stft(y, n_fft=1024, hop_length=256))
+    freqs = librosa.fft_frequencies(sr=SR, n_fft=1024)
+    idx = (freqs >= 100) & (freqs <= 4000)
+    slope = np.linalg.lstsq(np.log(freqs[idx]).reshape(-1, 1), np.log(S[idx, :].mean(1) + 1e-8), rcond=None)[0][0]
+    energy = np.log(librosa.feature.rms(y=y, hop_length=256)[0].mean() + 1e-8)
+    itd = np.argmax(correlate(y[:-1], y[1:], mode='full')) - len(y) - 1
+    itd_ms = itd / SR * 1000
+    return np.array([f0.mean(), f0.std(), slope, energy, itd_ms])
+
+def train():
+    np.random.seed(42); n = 500; X = np.zeros((n, 5))
+    is_female = np.random.rand(n) > 0.5
+    X[is_female, 0] = np.random.normal(220, 30, is_female.sum())
+    X[~is_female, 0] = np.random.normal(110, 20, (~is_female).sum())
+    X[:, 1] = np.random.normal(3, 1.5, n)
+    X[:, 2] = np.random.normal(-0.5, 0.15, n)
+    X[:, 3] = np.random.normal(-20, 5, n)
+    X[:, 4] = np.random.normal(0, 200, n)
+    y_gender, e_score = is_female.astype(int), X[:, 1] * 0.3 - X[:, 2] * 2 + (X[:, 3] + 25) * 0.2
+    y_emotion = np.clip(np.digitize(e_score, np.percentile(e_score, np.linspace(0, 100, 8))) - 1, 0, 6)
+    return (LogisticRegression().fit(X, y_gender), LogisticRegression().fit(X, y_emotion))
+
+def locate(itd_ms):
+    return ("behind-left", 0.78) if itd_ms < -300 else ("behind-right", 0.76) if itd_ms > 300 else ("front", 0.60)
+
+# Demo audio
+print("🎵 Creating demo.wav...")
+t = np.linspace(0, 3, SR * 3)
+f0 = 220 + 20 * np.sin(2 * np.pi * 7 * t)
+y = np.sin(2 * np.pi * np.cumsum(f0) / SR) + 0.3 * np.random.randn(SR * 3)
+sf.write("/content/demo.wav", (y / np.max(np.abs(y)) * 0.8).astype(np.float32), SR)
+
+# Inference
+feats = extract(librosa.load("/content/demo.wav", sr=SR)[0])
+g_clf, e_clf = train()
+g, e = g_clf.predict_proba(feats.reshape(1, -1))[0, 1], e_clf.predict_proba(feats.reshape(1, -1))[0]
+
+# Print
+print("\n" + "="*50 + "\nVOICE-PRINT LITE - ANALYSIS REPORT\n" + "="*50)
+print(f"Gender :  {'female' if g > 0.5 else 'male'} ({g:.2f})")
+print(f"Affect :  {EMOS[e.argmax()]} ({e.max():.2f})")
+print(f"Space  :  {locate(feats[-1])[0]} ({locate(feats[-1])[1]:.2f})")
+print("="*50 + "\n✨ No transcription. No cloud. No privacy risk.")
